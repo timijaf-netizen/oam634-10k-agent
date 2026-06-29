@@ -1,16 +1,57 @@
-// Vercel serverless function: receives extracted 10-K text, calls Claude, and STREAMS back the
-// model's JSON text. Streaming keeps the connection alive and avoids the non-streaming timeout.
-// The browser accumulates the stream and parses the JSON to render the visuals.
-// The API key is read from ANTHROPIC_API_KEY (set in the Vercel dashboard). It is never sent to
-// the browser. Do not put your key in this file or in GitHub.
+// Vercel serverless function: receives extracted 10-K text, calls Claude with a forced tool schema
+// (structured output), and returns a guaranteed-valid JSON analysis object. Using the model's
+// tool/structured-output mode removes JSON parsing failures entirely. Haiku is fast enough to run
+// non-streaming inside the 60s function limit.
+// The API key is read from ANTHROPIC_API_KEY (set in Vercel). It is never sent to the browser.
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001"; // most reliable for the structured JSON the visuals need; set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost or "claude-opus-4-8" for top quality
-const MAX_CHARS = 150000; // ~45k tokens of input; keeps latency well under the 60s function limit
+const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001"; // fast + cheap; set CLAUDE_MODEL to "claude-sonnet-4-6" for top quality
+const MAX_CHARS = 150000;
 
-// 10-Ks can be huge. If the text is very long, keep the front matter (Item 1 Business, Item 1A Risk
-// Factors) plus the MD&A region (around the last "Item 7") so the model sees the prioritized sections.
+// JSON Schema for the structured output. The model fills this exactly, so the result is always valid JSON.
+const S = { type: "string" };
+const N = { type: "number" };
+const obj = (props, required) => ({ type: "object", properties: props, required: required || Object.keys(props) });
+const list = (items) => ({ type: "array", items });
+const PE = obj({ point: S, evidence: S });
+
+const SCHEMA = obj({
+  company: S, fiscalYear: S, summary: S, valueProposition: S, pricePosition: S,
+  strategyStatement: obj({
+    objectives: list(PE),
+    where: obj({ customers: S, geography: S, products: S, notServing: S }),
+    how: list(PE),
+  }),
+  strategyMap: obj({
+    resources: list(obj({ id: S, name: S, detail: S, evidence: S })),
+    activities: list(obj({ id: S, name: S, detail: S, kind: S, evidence: S })),
+    valuePropositions: list(obj({ id: S, name: S, detail: S, evidence: S })),
+    intermediateObjectives: list(obj({ id: S, name: S, kind: S, detail: S, evidence: S })),
+    objective: obj({ name: S, detail: S }),
+    links: list(obj({ from: S, to: S, why: S })),
+  }),
+  valueStick: obj({
+    wtpScore: N, priceScore: N, wtsScore: N,
+    wtp: obj({ level: S, signal: S, evidence: S }),
+    price: obj({ position: S }),
+    wts: obj({ level: S, signal: S, evidence: S }),
+    advantageType: S,
+    sourcesResources: list(PE),
+    sourcesMarket: list(PE),
+    verdict: S, verdictEvidence: S,
+  }),
+  swot: obj({
+    strengths: list(PE),
+    weaknesses: list(PE),
+    opportunities: list(PE),
+    threats: list(obj({ point: S, type: S, evidence: S })),
+  }),
+  fiveForces: list(obj({ force: S, intensity: S, score: N, reason: S, evidence: S })),
+  financials: obj({ metrics: list(obj({ name: S, value: S, prior: S, note: S, evidence: S }, ["name", "value", "note"])) }),
+  strategicImplications: S,
+});
+
 function prepareDocument(raw) {
   const text = String(raw).replace(/\u0000/g, "").replace(/[ \t]{3,}/g, " ").trim();
   if (text.length <= MAX_CHARS) return text;
@@ -62,50 +103,32 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 3500,
+        max_tokens: 4096,
         temperature: 0,
-        stream: true,
         system: SYSTEM_PROMPT,
-        messages: [
-          { role: "user", content: "Analyze this company's 10-K and return ONLY the JSON object defined in your instructions. Begin your reply with { and end with }. No prose, no markdown, no code fences.\n\n<10-K>\n" + doc + "\n</10-K>" },
-        ],
+        tools: [{ name: "emit_analysis", description: "Return the structured OAM-634 strategic analysis of this 10-K.", input_schema: SCHEMA }],
+        tool_choice: { type: "tool", name: "emit_analysis" },
+        messages: [{ role: "user", content: "Analyze this company's 10-K using your instructions and return the analysis via the emit_analysis tool.\n\n<10-K>\n" + doc + "\n</10-K>" }],
       }),
     });
 
-    if (!upstream.ok || !upstream.body) {
+    if (!upstream.ok) {
       const errTxt = await upstream.text().catch(() => "");
       res.statusCode = 502;
       return res.end("Model API error (" + upstream.status + "): " + errTxt.slice(0, 600));
     }
 
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("X-Accel-Buffering", "no");
-
-    const reader = upstream.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
-      for (const line of lines) {
-        const l = line.trim();
-        if (!l.startsWith("data:")) continue;
-        const payload = l.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const evt = JSON.parse(payload);
-          if (evt.type === "content_block_delta" && evt.delta && evt.delta.type === "text_delta") {
-            res.write(evt.delta.text);
-          }
-        } catch (_) { /* ignore keep-alive / non-JSON lines */ }
-      }
+    const payload = await upstream.json();
+    const block = (payload.content || []).find((c) => c.type === "tool_use");
+    if (!block || !block.input) {
+      res.statusCode = 502;
+      return res.end("The model did not return a structured analysis. Please try again.");
     }
-    res.end();
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(block.input));
   } catch (e) {
     try {
       if (!res.headersSent) res.statusCode = 500;

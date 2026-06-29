@@ -1,22 +1,22 @@
-// Vercel serverless function: receives extracted 10-K text, calls Claude with a forced tool schema
-// (structured output), and returns a guaranteed-valid JSON analysis object. Using the model's
-// tool/structured-output mode removes JSON parsing failures entirely. Haiku is fast enough to run
-// non-streaming inside the 60s function limit.
+// Vercel serverless function: receives extracted 10-K text plus a "part" (a or b), calls Claude with a
+// forced tool schema (structured output), and returns a guaranteed-valid JSON fragment. The browser
+// requests both parts in parallel and merges them. Splitting the work keeps each call well under the
+// 60s function limit while letting Sonnet fill every section.
 // The API key is read from ANTHROPIC_API_KEY (set in Vercel). It is never sent to the browser.
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // thorough enough to fill every section; set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost (skips Five Forces / Financials)
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost
 const MAX_CHARS = 150000;
 
-// JSON Schema for the structured output. The model fills this exactly, so the result is always valid JSON.
 const S = { type: "string" };
 const N = { type: "number" };
 const obj = (props, required) => ({ type: "object", properties: props, required: required || Object.keys(props) });
 const list = (items, min, max) => { const a = { type: "array", items }; if (min != null) a.minItems = min; if (max != null) a.maxItems = max; return a; };
 const PE = obj({ point: S, evidence: S });
 
-const SCHEMA = obj({
+// Part A: the strategy story (statement + 5-column map + summary).
+const SCHEMA_A = obj({
   company: S, fiscalYear: S, summary: S, valueProposition: S, pricePosition: S,
   strategyStatement: obj({
     objectives: list(PE, 1),
@@ -31,6 +31,11 @@ const SCHEMA = obj({
     objective: obj({ name: S, detail: S }),
     links: list(obj({ from: S, to: S, why: S }), 6),
   }),
+  strategicImplications: S,
+});
+
+// Part B: the assessment (value stick, SWOT, five forces, financial scorecard).
+const SCHEMA_B = obj({
   valueStick: obj({
     wtpScore: N, priceScore: N, wtsScore: N,
     wtp: obj({ level: S, signal: S, evidence: S }),
@@ -49,7 +54,6 @@ const SCHEMA = obj({
   }),
   fiveForces: list(obj({ force: S, intensity: S, score: N, reason: S, evidence: S }), 5, 5),
   financials: obj({ metrics: list(obj({ name: S, value: S, prior: S, note: S, evidence: S }, ["name", "value", "note"]), 4) }),
-  strategicImplications: S,
 });
 
 function prepareDocument(raw) {
@@ -85,8 +89,11 @@ module.exports = async (req, res) => {
 
   try {
     const body = await readBody(req);
-    let text = "";
-    try { text = (JSON.parse(body || "{}").text) || ""; } catch (_) {}
+    let parsed = {};
+    try { parsed = JSON.parse(body || "{}"); } catch (_) {}
+    const text = parsed.text || "";
+    const part = parsed.part === "b" ? "b" : "a";
+    const SCHEMA = part === "b" ? SCHEMA_B : SCHEMA_A;
     if (!text || text.trim().length < 200) {
       res.statusCode = 400;
       return res.end("Could not read enough text from the PDF. Make sure it is a text-based 10-K (not a scan).");
@@ -103,12 +110,12 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        max_tokens: 3000,
         temperature: 0,
         system: SYSTEM_PROMPT,
-        tools: [{ name: "emit_analysis", description: "Return the structured OAM-634 strategic analysis of this 10-K.", input_schema: SCHEMA }],
+        tools: [{ name: "emit_analysis", description: "Return this part of the OAM-634 strategic analysis of the 10-K.", input_schema: SCHEMA }],
         tool_choice: { type: "tool", name: "emit_analysis" },
-        messages: [{ role: "user", content: "Analyze this company's 10-K using your instructions and return the analysis via the emit_analysis tool.\n\n<10-K>\n" + doc + "\n</10-K>" }],
+        messages: [{ role: "user", content: "Analyze this company's 10-K using your instructions and return the requested fields via the emit_analysis tool. Fill every field from the filing.\n\n<10-K>\n" + doc + "\n</10-K>" }],
       }),
     });
 

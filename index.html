@@ -309,10 +309,11 @@
       const text=await extractText(chosen);
       if(text.trim().length<200){setErr("Could not read enough text from this PDF. It may be a scan. Try the SEC EDGAR version.");go.disabled=false;return;}
       startLoader(); statusEl.textContent="Analyzing with the strategy frameworks.";
-      const resp=await fetch("/api/analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text})});
-      if(!resp.ok){stopLoader();const t=await resp.text().catch(()=> "");setErr("Analysis failed: "+(t||("HTTP "+resp.status)));go.disabled=false;return;}
+      const mk=(part)=>fetch("/api/analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,part})});
+      const [ra,rb]=await Promise.all([mk("a"),mk("b")]);
+      if(!ra.ok||!rb.ok){ stopLoader(); const bad=ra.ok?rb:ra; const t=await bad.text().catch(()=> ""); setErr("Analysis failed: "+(t||("HTTP "+bad.status))); go.disabled=false; return; }
       let data;
-      try{ data=await resp.json(); }
+      try{ const a=await ra.json(), b=await rb.json(); data=Object.assign({},a,b); }
       catch(e){ stopLoader(); setErr("Could not read the analysis. Please try again."); go.disabled=false; return; }
       stopLoader();
       lastData=data; render(data);

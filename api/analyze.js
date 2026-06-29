@@ -6,8 +6,8 @@
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // most reliable for the structured JSON the visuals need; set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost or "claude-opus-4-8" for top quality
-const MAX_CHARS = 200000; // ~45k tokens of input; keeps latency well under the 60s function limit
+const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001"; // most reliable for the structured JSON the visuals need; set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost or "claude-opus-4-8" for top quality
+const MAX_CHARS = 150000; // ~45k tokens of input; keeps latency well under the 60s function limit
 
 // 10-Ks can be huge. If the text is very long, keep the front matter (Item 1 Business, Item 1A Risk
 // Factors) plus the MD&A region (around the last "Item 7") so the model sees the prioritized sections.
@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 3500,
-        temperature: 0.2,
+        temperature: 0,
         stream: true,
         system: SYSTEM_PROMPT,
         messages: [

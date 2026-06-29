@@ -211,6 +211,14 @@
   const $ = (id)=>document.getElementById(id);
   const esc = (s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const arr = (x)=>Array.isArray(x)?x:[];
+  function parseLoose(raw){
+    const a=raw.indexOf("{"), b=raw.lastIndexOf("}");
+    if(a<0||b<0) throw new Error("no json");
+    let s=raw.slice(a,b+1);
+    try{ return JSON.parse(s); }catch(_){}
+    s=s.replace(/,(\s*[}\]])/g,"$1"); // strip trailing commas
+    return JSON.parse(s);
+  }
 
   let chosen=null, lastData=null;
   const fileInput=$("file"), drop=$("drop"), fname=$("fname"), go=$("go"), statusEl=$("status"), err=$("err");
@@ -262,8 +270,8 @@
       while(true){const{done,value}=await reader.read(); if(done) break; raw+=dec.decode(value,{stream:true});}
       stopLoader();
       let data;
-      try{ const a=raw.indexOf("{"), b=raw.lastIndexOf("}"); if(a<0||b<0) throw 0; data=JSON.parse(raw.slice(a,b+1)); }
-      catch(e){ setErr("Could not parse the analysis. Please try again."); go.disabled=false; return; }
+      try{ data=parseLoose(raw); }
+      catch(e){ setErr("Could not parse the analysis. Please try again. If it keeps happening, tell me to switch the model to Sonnet."); go.disabled=false; return; }
       lastData=data; render(data);
       statusEl.textContent="Done.";
       $("report").style.display="block";

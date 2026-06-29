@@ -60,7 +60,6 @@ module.exports = async (req, res) => {
     }
 
     const doc = prepareDocument(text);
-    const PREFILL = "{";
 
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -75,8 +74,7 @@ module.exports = async (req, res) => {
         temperature: 0.2,
         system: SYSTEM_PROMPT,
         messages: [
-          { role: "user", content: "Analyze this company's 10-K and return only the JSON object defined in your instructions.\n\n<10-K>\n" + doc + "\n</10-K>" },
-          { role: "assistant", content: PREFILL },
+          { role: "user", content: "Analyze this company's 10-K and return ONLY the JSON object defined in your instructions. Begin your reply with { and end with }. No prose, no markdown, no code fences.\n\n<10-K>\n" + doc + "\n</10-K>" },
         ],
       }),
     });
@@ -92,7 +90,7 @@ module.exports = async (req, res) => {
 
     let data;
     try {
-      data = extractJson(PREFILL, modelText);
+      data = extractJson("", modelText);
     } catch (e) {
       res.statusCode = 502;
       return res.end("The model did not return valid JSON. Try again. (" + (e.message || e) + ")");

@@ -1,12 +1,13 @@
-// Vercel serverless function: receives extracted 10-K text, calls Claude, returns a structured
-// JSON strategic analysis that the frontend renders as visuals.
+// Vercel serverless function: receives extracted 10-K text, calls Claude, and STREAMS back the
+// model's JSON text. Streaming keeps the connection alive and avoids the non-streaming timeout.
+// The browser accumulates the stream and parses the JSON to render the visuals.
 // The API key is read from ANTHROPIC_API_KEY (set in the Vercel dashboard). It is never sent to
 // the browser. Do not put your key in this file or in GitHub.
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // "claude-opus-4-8" for top quality, "claude-haiku-4-5-20251001" for cheapest/fastest
-const MAX_CHARS = 240000; // ~60k tokens of input; keeps latency under the 60s function limit
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // "claude-opus-4-8" top quality, "claude-haiku-4-5-20251001" cheapest/fastest
+const MAX_CHARS = 180000; // ~45k tokens of input; keeps latency well under the 60s function limit
 
 // 10-Ks can be huge. If the text is very long, keep the front matter (Item 1 Business, Item 1A Risk
 // Factors) plus the MD&A region (around the last "Item 7") so the model sees the prioritized sections.
@@ -32,15 +33,6 @@ function readBody(req) {
     req.on("end", () => resolve(data));
     req.on("error", reject);
   });
-}
-
-// Pull the JSON object out of the model text defensively.
-function extractJson(prefill, text) {
-  let combined = (prefill + text).trim();
-  const first = combined.indexOf("{");
-  const last = combined.lastIndexOf("}");
-  if (first === -1 || last === -1 || last < first) throw new Error("No JSON object found");
-  return JSON.parse(combined.slice(first, last + 1));
 }
 
 module.exports = async (req, res) => {
@@ -72,6 +64,7 @@ module.exports = async (req, res) => {
         model: MODEL,
         max_tokens: 4096,
         temperature: 0.2,
+        stream: true,
         system: SYSTEM_PROMPT,
         messages: [
           { role: "user", content: "Analyze this company's 10-K and return ONLY the JSON object defined in your instructions. Begin your reply with { and end with }. No prose, no markdown, no code fences.\n\n<10-K>\n" + doc + "\n</10-K>" },
@@ -79,27 +72,40 @@ module.exports = async (req, res) => {
       }),
     });
 
-    if (!upstream.ok) {
+    if (!upstream.ok || !upstream.body) {
       const errTxt = await upstream.text().catch(() => "");
       res.statusCode = 502;
       return res.end("Model API error (" + upstream.status + "): " + errTxt.slice(0, 600));
     }
 
-    const payload = await upstream.json();
-    const modelText = (payload && payload.content && payload.content[0] && payload.content[0].text) || "";
-
-    let data;
-    try {
-      data = extractJson("", modelText);
-    } catch (e) {
-      res.statusCode = 502;
-      return res.end("The model did not return valid JSON. Try again. (" + (e.message || e) + ")");
-    }
-
     res.statusCode = 200;
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store");
-    res.end(JSON.stringify(data));
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        const l = line.trim();
+        if (!l.startsWith("data:")) continue;
+        const payload = l.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const evt = JSON.parse(payload);
+          if (evt.type === "content_block_delta" && evt.delta && evt.delta.type === "text_delta") {
+            res.write(evt.delta.text);
+          }
+        } catch (_) { /* ignore keep-alive / non-JSON lines */ }
+      }
+    }
+    res.end();
   } catch (e) {
     try {
       if (!res.headersSent) res.statusCode = 500;

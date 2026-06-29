@@ -384,7 +384,7 @@
       (sub?'<text x="'+(barX-14)+'" y="'+(yy+18)+'" text-anchor="end" font-size="10" fill="#6b7785">'+sub+'</text>':'');
     const brace=(y1,y2,txt,color)=>{const xx=barX+barW+18;return '<line x1="'+xx+'" y1="'+y1+'" x2="'+xx+'" y2="'+y2+'" stroke="'+color+'" stroke-width="2"></line>'+
       '<text x="'+(xx+8)+'" y="'+((y1+y2)/2+4)+'" font-size="11" fill="'+color+'">'+txt+'</text>';};
-    const svg='<svg viewBox="0 0 300 '+H+'" width="100%" style="max-width:300px">'+
+    const svg='<svg viewBox="0 0 360 '+H+'" width="100%" style="max-width:330px">'+
       seg(bot,y(wts),"#eef1f6","#dde4ee")+
       seg(y(wts),y(price),"#f6eeda","#e4cf9a")+
       seg(y(price),y(wtp),"#eaf0f8","#bcd0ea")+

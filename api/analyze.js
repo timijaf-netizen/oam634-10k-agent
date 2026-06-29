@@ -20,7 +20,6 @@ const PE = obj({ point: S, evidence: S });
 const SCHEMA_A = obj({
   company: S, fiscalYear: S,
   summary: SD("Two sentences: what is this firm's strategy and the core competitive logic. Never empty."),
-  strategicImplications: SD("Two full sentences of your own synthesis, never empty and never 'Not disclosed'. Sentence one: the single biggest risk to this firm's value proposition, drawn from its activity system or the filing's risk factors. Sentence two: the single most important strategic question it now faces. Use specifics from this 10-K, not generic phrasing."),
   valueProposition: S, pricePosition: S,
   strategyStatement: obj({
     objectives: list(PE, 1),
@@ -35,6 +34,7 @@ const SCHEMA_A = obj({
     objective: obj({ name: S, detail: S }),
     links: list(obj({ from: S, to: S, why: S }), 6),
   }),
+  strategicImplications: SD("Two full sentences of your own synthesis, never empty and never 'Not disclosed'. Sentence one: the single biggest risk to this firm's value proposition, drawn from its activity system or the filing's risk factors. Sentence two: the single most important strategic question it now faces. Use specifics from this 10-K, not generic phrasing."),
 });
 
 // Part B: the assessment (value stick, SWOT, five forces, financial scorecard).
@@ -113,7 +113,7 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 3000,
+        max_tokens: 4096,
         temperature: 0,
         system: SYSTEM_PROMPT,
         tools: [{ name: "emit_analysis", description: "Return this part of the OAM-634 strategic analysis of the 10-K.", input_schema: SCHEMA }],

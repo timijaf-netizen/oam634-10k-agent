@@ -121,6 +121,47 @@
   .links .lk{font-size:13px;margin:0 0 7px}
   .links .lk b{color:var(--navy-deep)}
 
+  /* 5-column strategy flow */
+  .flowscroll{overflow-x:auto;padding-bottom:4px}
+  .flowstage{position:relative;min-width:1000px}
+  .flowcols{display:grid;grid-template-columns:1fr 1.05fr 1fr 1fr .9fr;gap:24px;position:relative;z-index:2}
+  .fhead{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;text-align:center;margin:0 0 12px;padding-bottom:6px;border-bottom:2px solid #e6eaf1}
+  .fhead.RES{color:#1f4e78}.fhead.ACT{color:#b0661f}.fhead.VP{color:#9a7d1f}.fhead.OBJ{color:#5b3fa0}.fhead.FIN{color:#2f7d52}
+  .fnode{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:0 0 14px;box-shadow:0 1px 2px rgba(20,48,77,.06)}
+  .fnode .fnm{font-weight:700;font-size:12px;color:var(--navy-deep);line-height:1.25}
+  .fnode .fdt{font-size:11px;color:#55626f;margin-top:3px;line-height:1.3}
+  .fnode .ev{margin-top:4px;font-size:10.5px}
+  .fnode.res{border-left:4px solid #2f5e9e;background:#f4f8fd}
+  .fnode.act{border-left:4px solid #c0801f;background:#fdf7ed}
+  .fnode.act.non{border:1px dashed #d9a55a;border-left:4px solid #c0801f}
+  .fnode.vp{border-left:4px solid #b39418;background:#fdfcef}
+  .fnode.obj{border-left:4px solid #6b4fc0;background:#f6f4fd}
+  .fnode.fin{border-left:4px solid #2f7d52;background:#eef6f1}
+  .ktag{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;border-radius:6px;padding:1px 6px;margin-bottom:4px}
+  .ktag.cost{background:#efe9fb;color:#5b3fa0}.ktag.rev{background:#e7f1ff;color:#2f5e9e}
+  .dot.res{background:#2f5e9e}.dot.act{background:#c0801f}.dot.vp{background:#b39418}.dot.obj{background:#6b4fc0}
+  .dash{display:inline-block;width:16px;border-top:2px dashed #c08a2e;vertical-align:middle}
+
+  /* five forces */
+  .forces{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.forces{grid-template-columns:1fr}}
+  .force{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fbfcff}
+  .force .ft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .force .fn{font-weight:700;font-size:13.5px;color:var(--navy-deep)}
+  .force .rs{font-size:13px;color:#52606d}
+  .ints{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .ints.High{background:var(--red-soft);color:var(--red)}
+  .ints.Medium{background:var(--amber-soft);color:var(--amber)}
+  .ints.Low{background:var(--green-soft);color:var(--green)}
+  .score{font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:1px}
+
+  /* financials */
+  table.fin{width:100%;border-collapse:collapse;font-size:13px}
+  table.fin th,table.fin td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.fin th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  table.fin td.n{font-weight:700;color:var(--navy-deep)}
+  table.fin td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
   /* Value stick */
   .stickwrap{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
   @media(max-width:780px){.stickwrap{grid-template-columns:1fr}}
@@ -192,6 +233,8 @@
         <button class="tab" data-tab="map">Strategy Map</button>
         <button class="tab" data-tab="stick">Value Stick</button>
         <button class="tab" data-tab="swot">SWOT</button>
+        <button class="tab" data-tab="forces">Five Forces</button>
+        <button class="tab" data-tab="financials">Financials</button>
       </div>
 
       <div class="panel active" id="tab-summary"></div>
@@ -199,6 +242,8 @@
       <div class="panel" id="tab-map"></div>
       <div class="panel" id="tab-stick"></div>
       <div class="panel" id="tab-swot"></div>
+      <div class="panel" id="tab-forces"></div>
+      <div class="panel" id="tab-financials"></div>
     </div>
   </section>
 </main>
@@ -249,7 +294,7 @@
     return text;
   }
 
-  const STEPS=["Reading the filing","Locating Items 1, 1A and 7","Mapping the activity system","Building the value stick","Assembling the SWOT","Writing it up cleanly"];
+  const STEPS=["Reading the filing","Locating Items 1, 1A and 7","Mapping resources to activities","Building the value stick","Assembling the SWOT","Scoring the five forces","Pulling the financials","Writing it up cleanly"];
   let stepTimer=null;
   function startLoader(){
     loader.classList.add("show"); let i=0, p=10; loadmsg.textContent=STEPS[0]; loadfill.style.width="10%";
@@ -292,7 +337,7 @@
     $("r-badges").innerHTML=
       '<span class="pill navy">Advantage: '+esc(adv)+'</span>'+
       (d.pricePosition?'<span class="pill gold">Price: '+esc(d.pricePosition)+'</span>':'');
-    renderSummary(d); renderStrategy(d); renderMap(d); renderStick(d); renderSwot(d);
+    renderSummary(d); renderStrategy(d); renderMap(d); renderStick(d); renderSwot(d); renderForces(d); renderFinancials(d);
     activate("summary");
   }
 
@@ -329,52 +374,64 @@
   }
 
   function renderMap(d){
-    const m=d.strategyMap||{}, acts=arr(m.activities), links=arr(m.links);
-    const wtp=acts.filter(a=>(a.type||"").toUpperCase()==="WTP");
-    const wts=acts.filter(a=>(a.type||"").toUpperCase()!=="WTP");
-    const nodeHtml=(a)=>'<div class="node '+((a.type||"").toUpperCase()==="WTP"?"wtp":"wts")+'" data-node="'+esc(a.id)+'">'+
-      '<div class="nm">'+esc(a.name||"")+'</div><div class="wy">'+esc(a.why||"")+'</div>'+
-      (a.evidence?'<span class="ev">'+esc(a.evidence)+'</span>':'')+'</div>';
+    const m=d.strategyMap||{};
+    const R=arr(m.resources), A=arr(m.activities), V=arr(m.valuePropositions), O=arr(m.intermediateObjectives), links=arr(m.links);
+    const obj=m.objective||{};
+    const evx=(o)=> o.evidence?'<span class="ev">'+esc(o.evidence)+'</span>':'';
+    const node=(o,cls,tag)=>'<div class="fnode '+cls+'" data-node="'+esc(o.id)+'">'+(tag||'')+
+      '<div class="fnm">'+esc(o.name||"")+'</div>'+(o.detail?'<div class="fdt">'+esc(o.detail)+'</div>':'')+evx(o)+'</div>';
+    const col=(head,cls,html)=>'<div class="fcol"><div class="fhead '+cls+'">'+head+'</div>'+(html||'<div class="fnode" style="color:var(--muted)">Not disclosed</div>')+'</div>';
+    const resHtml=R.map(o=>node(o,"res")).join("");
+    const actHtml=A.map(o=>node(o,"act"+((o.kind||"")==="nonactivity"?" non":""))).join("");
+    const vpHtml=V.map(o=>node(o,"vp")).join("");
+    const objHtml=O.map(o=>{const k=(o.kind||"").toLowerCase()==="cost"?"cost":"rev";return node(o,"obj "+k,'<span class="ktag '+k+'">'+(k==="cost"?"Cost · firm":"Revenue")+'</span>');}).join("");
+    const finHtml='<div class="fnode fin" data-node="objective"><div class="fnm">'+esc(obj.name||"Objective")+'</div>'+(obj.detail?'<div class="fdt">'+esc(obj.detail)+'</div>':'')+'</div>';
+    const nameById={}; [].concat(R,A,V,O).forEach(o=>{if(o&&o.id)nameById[o.id]=o.name;}); nameById["objective"]=obj.name||"Objective";
     const linksHtml=links.map(l=>{
-      const f=acts.find(a=>a.id===l.from), t=acts.find(a=>a.id===l.to);
-      const fn=f?f.name:l.from, tn=t?t.name:l.to;
-      return '<div class="lk"><b>'+esc(fn)+'</b> &#8594; <b>'+esc(tn)+'</b>: '+esc(l.why||"")+'</div>';
+      const fn=nameById[l.from]||l.from, tn=nameById[l.to]||l.to;
+      return '<div class="lk"><b>'+esc(fn)+'</b> &#8594; <b>'+esc(tn)+'</b>'+(l.why?': '+esc(l.why):'')+'</div>';
     }).join("");
     $("tab-map").innerHTML=
-      '<div class="vpbanner"><div class="lab">Value proposition</div><div class="txt">'+esc(d.valueProposition||"")+'</div></div>'+
-      '<div class="legend"><span><i class="dot wtp"></i> Raises willingness to pay (WTP)</span><span><i class="dot wts"></i> Lowers cost / willingness to sell (WTS)</span></div>'+
-      '<div class="mapstage" id="mapstage"><svg class="arrows" id="arrows"><defs>'+
-        '<marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9bb0cc"></path></marker>'+
+      '<div class="flowscroll"><div class="flowstage" id="mapstage">'+
+        '<svg class="arrows" id="arrows"><defs>'+
+          '<marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9bb0cc"></path></marker>'+
+          '<marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#c08a2e"></path></marker>'+
         '</defs></svg>'+
-        '<div class="mapcols">'+
-          '<div><div class="colhead wtp">WTP-raising activities</div>'+(wtp.map(nodeHtml).join("")||'<div class="node">None identified</div>')+'</div>'+
-          '<div><div class="colhead wts">WTS-lowering activities</div>'+(wts.map(nodeHtml).join("")||'<div class="node">None identified</div>')+'</div>'+
+        '<div class="flowcols">'+
+          col("Resources","RES",resHtml)+
+          col("Activities","ACT",actHtml)+
+          col("Value Propositions","VP",vpHtml)+
+          col("Intermediate Objectives","OBJ",objHtml)+
+          col("Objective","FIN",finHtml)+
         '</div>'+
-      '</div>'+
-      '<div class="links"><h4>Reinforcement links (why the activities strengthen each other)</h4>'+(linksHtml||'<div class="lk" style="color:var(--muted)">Not disclosed in 10-K</div>')+'</div>';
+      '</div></div>'+
+      '<div class="legend"><span><i class="dot res"></i> Resources</span><span><i class="dot act"></i> Activities</span><span><i class="dot vp"></i> Value props (price = what customers pay)</span><span><i class="dot obj"></i> Objectives (cost = what the firm pays)</span><span><i class="dash"></i> Dashed = non-activities flowing to cost</span></div>'+
+      '<div class="links"><h4>Causal linkages</h4>'+(linksHtml||'<div class="lk" style="color:var(--muted)">Not disclosed in 10-K</div>')+'</div>';
   }
 
-  function drawArrows(){
+  function drawFlow(){
     const stage=$("mapstage"); if(!stage||!stage.offsetWidth) return;
     const svg=$("arrows"); if(!svg) return;
     while(svg.childNodes.length>1) svg.removeChild(svg.lastChild); // keep <defs>
-    const links=arr((lastData.strategyMap||{}).links);
-    const sb=stage.getBoundingClientRect();
-    const center=(el)=>{const r=el.getBoundingClientRect();return{x:r.left-sb.left+r.width/2,y:r.top-sb.top+r.height/2,w:r.width,h:r.height};};
-    const edge=(c,tx,ty)=>{const dx=tx-c.x,dy=ty-c.y;if(!dx&&!dy)return c;const sx=dx?(c.w/2)/Math.abs(dx):1e9,sy=dy?(c.h/2)/Math.abs(dy):1e9;const s=Math.min(sx,sy);return{x:c.x+dx*s,y:c.y+dy*s};};
-    links.forEach(l=>{
+    const m=lastData.strategyMap||{}, acts=arr(m.activities);
+    const isNon=(id)=>{const a=acts.find(x=>x&&x.id===id);return !!(a&&(a.kind||"")==="nonactivity");};
+    const sb=stage.getBoundingClientRect(), NS="http://www.w3.org/2000/svg";
+    arr(m.links).forEach(l=>{
       const a=stage.querySelector('[data-node="'+CSS.escape(String(l.from))+'"]');
       const b=stage.querySelector('[data-node="'+CSS.escape(String(l.to))+'"]');
       if(!a||!b) return;
-      const ca=center(a), cb=center(b);
-      const p1=edge(ca,cb.x,cb.y), p2=edge(cb,ca.x,ca.y);
-      const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.hypot(dx,dy)||1;
-      const off=Math.min(38,len*0.16),px=-dy/len*off,py=dx/len*off;
-      const path=document.createElementNS("http://www.w3.org/2000/svg","path");
-      path.setAttribute("d","M"+p1.x+","+p1.y+" Q"+(mx+px)+","+(my+py)+" "+p2.x+","+p2.y);
-      path.setAttribute("fill","none");path.setAttribute("stroke","#9bb0cc");path.setAttribute("stroke-width","1.6");
-      path.setAttribute("marker-end","url(#ah)");
-      svg.appendChild(path);
+      const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+      const x1=ra.right-sb.left, y1=ra.top-sb.top+ra.height/2;
+      const x2=rb.left-sb.left, y2=rb.top-sb.top+rb.height/2;
+      const dx=Math.max(26,(x2-x1)*0.45), non=isNon(l.from);
+      const p=document.createElementNS(NS,"path");
+      p.setAttribute("d","M"+x1+","+y1+" C"+(x1+dx)+","+y1+" "+(x2-dx)+","+y2+" "+x2+","+y2);
+      p.setAttribute("fill","none");
+      p.setAttribute("stroke",non?"#c08a2e":"#9bb0cc");
+      p.setAttribute("stroke-width","1.5");
+      if(non) p.setAttribute("stroke-dasharray","5 4");
+      p.setAttribute("marker-end",non?"url(#ahg)":"url(#ah)");
+      svg.appendChild(p);
     });
   }
 
@@ -396,20 +453,21 @@
       seg(bot,y(wts),"#eef1f6","#dde4ee")+
       seg(y(wts),y(price),"#f6eeda","#e4cf9a")+
       seg(y(price),y(wtp),"#eaf0f8","#bcd0ea")+
-      tick(y(wtp),"WTP",vs.wtp&&vs.wtp.level?vs.wtp.level:"")+
-      tick(y(price),"Price","")+
-      tick(y(wts),"WTS",vs.wts&&vs.wts.level?vs.wts.level:"")+
+      tick(y(wtp),"WTP",vs.wtp&&vs.wtp.level?vs.wtp.level:"ceiling")+
+      tick(y(price),"Price","you pay")+
+      tick(y(wts),"Cost","to firm")+
       brace(y(wtp),y(price),"Customer surplus","#2f5e9e")+
       brace(y(price),y(wts),"Firm margin","#9c7320")+
-      '<text x="'+(barX+barW/2)+'" y="'+(bot+22)+'" text-anchor="middle" font-size="10" fill="#6b7785">Cost floor</text>'+
+      '<text x="'+(barX+barW/2)+'" y="'+(bot+22)+'" text-anchor="middle" font-size="10" fill="#6b7785">Firm cost (WTS)</text>'+
       '</svg>';
     const sideList=(list)=>arr(list).map(o=>'<div class="item">'+esc(o.point||"")+(o.evidence?'<span class="ev">'+esc(o.evidence)+'</span>':'')+'</div>').join("")||'<div class="item" style="color:var(--muted)">Not disclosed</div>';
     $("tab-stick").innerHTML=
       '<div class="stickwrap">'+
         '<div class="sub" style="text-align:center">'+svg+
-          '<div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:left">'+
+          '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;text-align:left">'+
             '<p class="kv"><b>WTP signal:</b> '+esc((vs.wtp&&vs.wtp.signal)||"Not disclosed")+'</p>'+
-            '<p class="kv"><b>WTS signal:</b> '+esc((vs.wts&&vs.wts.signal)||"Not disclosed")+'</p>'+
+            '<p class="kv"><b>Cost signal:</b> '+esc((vs.wts&&vs.wts.signal)||"Not disclosed")+'</p>'+
+            '<p style="margin-top:8px;color:#7a8699">Price is what customers pay. Cost (WTS) is what the firm spends.</p>'+
           '</div>'+
         '</div>'+
         '<div>'+
@@ -437,14 +495,33 @@
       '<div class="callout" style="margin-top:18px"><b>Strategic implications.</b> '+esc(d.strategicImplications||"")+'</div>';
   }
 
+  function renderForces(d){
+    const F=arr(d.fiveForces);
+    const dots=(n)=>{n=Math.max(0,Math.min(5,Math.round(Number(n)||0)));let s="";for(let i=0;i<5;i++)s+=(i<n?"●":"○");return s;};
+    const html=F.map(f=>{
+      const it=(f.intensity||"").replace(/[^A-Za-z]/g,"");
+      return '<div class="force"><div class="ft"><span class="fn">'+esc(f.force||"")+'</span>'+
+        '<span><span class="ints '+esc(it)+'">'+esc(f.intensity||"")+'</span><span class="score">'+dots(f.score)+'</span></span></div>'+
+        '<div class="rs">'+esc(f.reason||"")+(f.evidence?'<span class="ev">'+esc(f.evidence)+'</span>':'')+'</div></div>';
+    }).join("")||'<div class="item" style="color:var(--muted)">Not disclosed in 10-K</div>';
+    $("tab-forces").innerHTML='<div class="forces">'+html+'</div>';
+  }
+
+  function renderFinancials(d){
+    const M=arr((d.financials||{}).metrics);
+    if(!M.length){ $("tab-financials").innerHTML='<div class="item" style="color:var(--muted)">No financial figures were disclosed clearly enough to extract.</div>'; return; }
+    const rows=M.map(m=>'<tr><td class="n">'+esc(m.name||"")+'</td><td class="num">'+esc(m.value||"")+'</td><td class="num">'+esc(m.prior||"")+'</td><td>'+esc(m.note||"")+(m.evidence?'<span class="ev">'+esc(m.evidence)+'</span>':'')+'</td></tr>').join("");
+    $("tab-financials").innerHTML='<table class="fin"><tr><th>Metric</th><th>Current</th><th>Prior</th><th>Commentary</th></tr>'+rows+'</table>';
+  }
+
   // ---------- TABS ----------
   function activate(name){
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
     document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id==="tab-"+name));
-    if(name==="map") requestAnimationFrame(drawArrows);
+    if(name==="map") requestAnimationFrame(drawFlow);
   }
   document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>activate(t.dataset.tab)));
-  window.addEventListener("resize",()=>{ if($("tab-map").classList.contains("active")) drawArrows(); });
+  window.addEventListener("resize",()=>{ if($("tab-map").classList.contains("active")) drawFlow(); });
 </script>
 </body>
 </html>

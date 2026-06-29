@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        max_tokens: 8000,
         temperature: 0.2,
         stream: true,
         system: SYSTEM_PROMPT,

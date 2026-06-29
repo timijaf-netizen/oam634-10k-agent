@@ -1,15 +1,15 @@
-// Vercel serverless function — receives extracted 10-K text, calls Claude, streams back the analysis.
-// The API key is read from the ANTHROPIC_API_KEY environment variable (set in the Vercel dashboard).
-// It is NEVER sent to the browser. Do not put your key in this file or in GitHub.
+// Vercel serverless function: receives extracted 10-K text, calls Claude, returns a structured
+// JSON strategic analysis that the frontend renders as visuals.
+// The API key is read from ANTHROPIC_API_KEY (set in the Vercel dashboard). It is never sent to
+// the browser. Do not put your key in this file or in GitHub.
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // switch to "claude-opus-4-8" for max quality
-const MAX_CHARS = 350000; // ~85k tokens of input; keeps cost/latency sane and fits Claude's context
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // "claude-opus-4-8" for top quality, "claude-haiku-4-5-20251001" for cheapest/fastest
+const MAX_CHARS = 240000; // ~60k tokens of input; keeps latency under the 60s function limit
 
 // 10-Ks can be huge. If the text is very long, keep the front matter (Item 1 Business, Item 1A Risk
-// Factors usually live here) plus the MD&A region (around the last "Item 7") so the model still sees
-// the sections the instructions tell it to prioritize.
+// Factors) plus the MD&A region (around the last "Item 7") so the model sees the prioritized sections.
 function prepareDocument(raw) {
   const text = String(raw).replace(/\u0000/g, "").replace(/[ \t]{3,}/g, " ").trim();
   if (text.length <= MAX_CHARS) return text;
@@ -34,11 +34,17 @@ function readBody(req) {
   });
 }
 
+// Pull the JSON object out of the model text defensively.
+function extractJson(prefill, text) {
+  let combined = (prefill + text).trim();
+  const first = combined.indexOf("{");
+  const last = combined.lastIndexOf("}");
+  if (first === -1 || last === -1 || last < first) throw new Error("No JSON object found");
+  return JSON.parse(combined.slice(first, last + 1));
+}
+
 module.exports = async (req, res) => {
-  if (req.method !== "POST") {
-    res.statusCode = 405;
-    return res.end("Method not allowed");
-  }
+  if (req.method !== "POST") { res.statusCode = 405; return res.end("Method not allowed"); }
   if (!process.env.ANTHROPIC_API_KEY) {
     res.statusCode = 500;
     return res.end("Server is missing ANTHROPIC_API_KEY. Set it in the Vercel project's Environment Variables.");
@@ -54,6 +60,7 @@ module.exports = async (req, res) => {
     }
 
     const doc = prepareDocument(text);
+    const PREFILL = "{";
 
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -65,59 +72,40 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 4096,
-        stream: true,
+        temperature: 0.2,
         system: SYSTEM_PROMPT,
         messages: [
-          {
-            role: "user",
-            content:
-              "Here is the company's 10-K. Produce the full four-section strategic analysis exactly as specified in your instructions. Do not ask any questions first.\n\n<10-K>\n" +
-              doc +
-              "\n</10-K>",
-          },
+          { role: "user", content: "Analyze this company's 10-K and return only the JSON object defined in your instructions.\n\n<10-K>\n" + doc + "\n</10-K>" },
+          { role: "assistant", content: PREFILL },
         ],
       }),
     });
 
-    if (!upstream.ok || !upstream.body) {
+    if (!upstream.ok) {
       const errTxt = await upstream.text().catch(() => "");
       res.statusCode = 502;
       return res.end("Model API error (" + upstream.status + "): " + errTxt.slice(0, 600));
     }
 
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("X-Accel-Buffering", "no");
+    const payload = await upstream.json();
+    const modelText = (payload && payload.content && payload.content[0] && payload.content[0].text) || "";
 
-    const reader = upstream.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
-      for (const line of lines) {
-        const l = line.trim();
-        if (!l.startsWith("data:")) continue;
-        const payload = l.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const evt = JSON.parse(payload);
-          if (evt.type === "content_block_delta" && evt.delta && evt.delta.type === "text_delta") {
-            res.write(evt.delta.text);
-          }
-        } catch (_) { /* ignore keep-alive / non-JSON lines */ }
-      }
+    let data;
+    try {
+      data = extractJson(PREFILL, modelText);
+    } catch (e) {
+      res.statusCode = 502;
+      return res.end("The model did not return valid JSON. Try again. (" + (e.message || e) + ")");
     }
-    res.end();
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(data));
   } catch (e) {
     try {
       if (!res.headersSent) res.statusCode = 500;
-      res.end("\n[Server error: " + (e && e.message ? e.message : String(e)) + "]");
+      res.end("Server error: " + (e && e.message ? e.message : String(e)));
     } catch (_) {}
   }
 };

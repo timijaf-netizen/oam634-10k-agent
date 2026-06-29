@@ -257,9 +257,13 @@
       if(text.trim().length<200){setErr("Could not read enough text from this PDF. It may be a scan. Try the SEC EDGAR version.");go.disabled=false;return;}
       startLoader(); statusEl.textContent="Analyzing with the strategy frameworks.";
       const resp=await fetch("/api/analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text})});
+      if(!resp.ok||!resp.body){stopLoader();const t=await resp.text().catch(()=> "");setErr("Analysis failed: "+(t||("HTTP "+resp.status)));go.disabled=false;return;}
+      const reader=resp.body.getReader(), dec=new TextDecoder(); let raw="";
+      while(true){const{done,value}=await reader.read(); if(done) break; raw+=dec.decode(value,{stream:true});}
       stopLoader();
-      if(!resp.ok){const t=await resp.text().catch(()=> "");setErr("Analysis failed: "+(t||("HTTP "+resp.status)));go.disabled=false;return;}
-      const data=await resp.json();
+      let data;
+      try{ const a=raw.indexOf("{"), b=raw.lastIndexOf("}"); if(a<0||b<0) throw 0; data=JSON.parse(raw.slice(a,b+1)); }
+      catch(e){ setErr("Could not parse the analysis. Please try again."); go.disabled=false; return; }
       lastData=data; render(data);
       statusEl.textContent="Done.";
       $("report").style.display="block";

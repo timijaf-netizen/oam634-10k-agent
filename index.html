@@ -344,12 +344,12 @@
     const vs=d.valueStick||{};
     $("tab-summary").innerHTML=
       '<div class="callout">'+esc(d.summary||"")+'</div>'+
-      '<div class="grid3" style="margin-top:18px">'+
-        card("Value proposition", esc(d.valueProposition||"Not disclosed in 10-K"))+
+      '<div class="grid2" style="margin-top:18px">'+
         card("Advantage type", esc(vs.advantageType||"Unclear"))+
-        card("Competitive verdict", esc(vs.verdict||"Not disclosed in 10-K"))+
+        card("Price position", esc(d.pricePosition||"Not disclosed in 10-K"))+
       '</div>'+
-      '<div class="sub" style="margin-top:18px"><h4>Strategic implication</h4><div class="item">'+esc(d.strategicImplications||"Not disclosed in 10-K")+'</div></div>';
+      '<div class="sub" style="margin-top:16px"><h4>Competitive verdict</h4><div class="item">'+esc(vs.verdict||"Not disclosed in 10-K")+'</div></div>'+
+      '<div class="sub" style="margin-top:16px"><h4>Strategic implication</h4><div class="item">'+esc(d.strategicImplications||"Not disclosed in 10-K")+'</div></div>';
   }
   function card(h,b){return '<div class="sub"><h4>'+h+'</h4><div class="item">'+b+'</div></div>';}
 
@@ -415,19 +415,20 @@
     const m=lastData.strategyMap||{}, acts=arr(m.activities);
     const isNon=(id)=>{const a=acts.find(x=>x&&x.id===id);return !!(a&&(a.kind||"")==="nonactivity");};
     const sb=stage.getBoundingClientRect(), NS="http://www.w3.org/2000/svg";
-    arr(m.links).forEach(l=>{
+    arr(m.links).forEach((l,i)=>{
       const a=stage.querySelector('[data-node="'+CSS.escape(String(l.from))+'"]');
       const b=stage.querySelector('[data-node="'+CSS.escape(String(l.to))+'"]');
       if(!a||!b) return;
       const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
-      const x1=ra.right-sb.left, y1=ra.top-sb.top+ra.height/2;
-      const x2=rb.left-sb.left, y2=rb.top-sb.top+rb.height/2;
-      const dx=Math.max(26,(x2-x1)*0.45), non=isNon(l.from);
+      const x1=ra.right-sb.left, y1=Math.round(ra.top-sb.top+ra.height/2);
+      const x2=rb.left-sb.left, y2=Math.round(rb.top-sb.top+rb.height/2);
+      const ch=x1+10+(i%5)*6, non=isNon(l.from); // vertical channel in the gap after the source, lightly staggered
       const p=document.createElementNS(NS,"path");
-      p.setAttribute("d","M"+x1+","+y1+" C"+(x1+dx)+","+y1+" "+(x2-dx)+","+y2+" "+x2+","+y2);
+      p.setAttribute("d","M "+x1+" "+y1+" H "+ch+" V "+y2+" H "+x2);
       p.setAttribute("fill","none");
-      p.setAttribute("stroke",non?"#c08a2e":"#9bb0cc");
+      p.setAttribute("stroke",non?"#c79334":"#9aabc6");
       p.setAttribute("stroke-width","1.5");
+      p.setAttribute("stroke-linejoin","round");
       if(non) p.setAttribute("stroke-dasharray","5 4");
       p.setAttribute("marker-end",non?"url(#ahg)":"url(#ah)");
       svg.appendChild(p);

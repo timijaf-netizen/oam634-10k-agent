@@ -13,23 +13,23 @@ const MAX_CHARS = 150000;
 const S = { type: "string" };
 const N = { type: "number" };
 const obj = (props, required) => ({ type: "object", properties: props, required: required || Object.keys(props) });
-const list = (items) => ({ type: "array", items });
+const list = (items, min, max) => { const a = { type: "array", items }; if (min != null) a.minItems = min; if (max != null) a.maxItems = max; return a; };
 const PE = obj({ point: S, evidence: S });
 
 const SCHEMA = obj({
   company: S, fiscalYear: S, summary: S, valueProposition: S, pricePosition: S,
   strategyStatement: obj({
-    objectives: list(PE),
+    objectives: list(PE, 1),
     where: obj({ customers: S, geography: S, products: S, notServing: S }),
-    how: list(PE),
+    how: list(PE, 3),
   }),
   strategyMap: obj({
-    resources: list(obj({ id: S, name: S, detail: S, evidence: S })),
-    activities: list(obj({ id: S, name: S, detail: S, kind: S, evidence: S })),
-    valuePropositions: list(obj({ id: S, name: S, detail: S, evidence: S })),
-    intermediateObjectives: list(obj({ id: S, name: S, kind: S, detail: S, evidence: S })),
+    resources: list(obj({ id: S, name: S, detail: S, evidence: S }), 3),
+    activities: list(obj({ id: S, name: S, detail: S, kind: S, evidence: S }), 5),
+    valuePropositions: list(obj({ id: S, name: S, detail: S, evidence: S }), 2),
+    intermediateObjectives: list(obj({ id: S, name: S, kind: S, detail: S, evidence: S }), 2, 2),
     objective: obj({ name: S, detail: S }),
-    links: list(obj({ from: S, to: S, why: S })),
+    links: list(obj({ from: S, to: S, why: S }), 6),
   }),
   valueStick: obj({
     wtpScore: N, priceScore: N, wtsScore: N,
@@ -37,18 +37,18 @@ const SCHEMA = obj({
     price: obj({ position: S }),
     wts: obj({ level: S, signal: S, evidence: S }),
     advantageType: S,
-    sourcesResources: list(PE),
-    sourcesMarket: list(PE),
+    sourcesResources: list(PE, 1),
+    sourcesMarket: list(PE, 1),
     verdict: S, verdictEvidence: S,
   }),
   swot: obj({
-    strengths: list(PE),
-    weaknesses: list(PE),
-    opportunities: list(PE),
-    threats: list(obj({ point: S, type: S, evidence: S })),
+    strengths: list(PE, 3),
+    weaknesses: list(PE, 2),
+    opportunities: list(PE, 2),
+    threats: list(obj({ point: S, type: S, evidence: S }), 3),
   }),
-  fiveForces: list(obj({ force: S, intensity: S, score: N, reason: S, evidence: S })),
-  financials: obj({ metrics: list(obj({ name: S, value: S, prior: S, note: S, evidence: S }, ["name", "value", "note"])) }),
+  fiveForces: list(obj({ force: S, intensity: S, score: N, reason: S, evidence: S }), 5, 5),
+  financials: obj({ metrics: list(obj({ name: S, value: S, prior: S, note: S, evidence: S }, ["name", "value", "note"]), 4) }),
   strategicImplications: S,
 });
 

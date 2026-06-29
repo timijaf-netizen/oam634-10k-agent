@@ -6,7 +6,7 @@
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // "claude-opus-4-8" top quality, "claude-haiku-4-5-20251001" cheapest/fastest
+const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001"; // cheapest/fastest; set CLAUDE_MODEL env var to "claude-sonnet-4-6" or "claude-opus-4-8" for higher quality
 const MAX_CHARS = 180000; // ~45k tokens of input; keeps latency well under the 60s function limit
 
 // 10-Ks can be huge. If the text is very long, keep the front matter (Item 1 Business, Item 1A Risk

@@ -310,13 +310,11 @@
       if(text.trim().length<200){setErr("Could not read enough text from this PDF. It may be a scan. Try the SEC EDGAR version.");go.disabled=false;return;}
       startLoader(); statusEl.textContent="Analyzing with the strategy frameworks.";
       const resp=await fetch("/api/analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text})});
-      if(!resp.ok||!resp.body){stopLoader();const t=await resp.text().catch(()=> "");setErr("Analysis failed: "+(t||("HTTP "+resp.status)));go.disabled=false;return;}
-      const reader=resp.body.getReader(), dec=new TextDecoder(); let raw="";
-      while(true){const{done,value}=await reader.read(); if(done) break; raw+=dec.decode(value,{stream:true});}
-      stopLoader();
+      if(!resp.ok){stopLoader();const t=await resp.text().catch(()=> "");setErr("Analysis failed: "+(t||("HTTP "+resp.status)));go.disabled=false;return;}
       let data;
-      try{ data=parseLoose(raw); }
-      catch(e){ setErr("Could not parse the analysis. Please try again. If it keeps happening, tell me to switch the model to Sonnet."); go.disabled=false; return; }
+      try{ data=await resp.json(); }
+      catch(e){ stopLoader(); setErr("Could not read the analysis. Please try again."); go.disabled=false; return; }
+      stopLoader();
       lastData=data; render(data);
       statusEl.textContent="Done.";
       $("report").style.display="block";

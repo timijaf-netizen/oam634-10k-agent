@@ -6,7 +6,7 @@
 
 const SYSTEM_PROMPT = require("./instructions.js");
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001"; // fast + cheap; set CLAUDE_MODEL to "claude-sonnet-4-6" for top quality
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6"; // thorough enough to fill every section; set CLAUDE_MODEL to "claude-haiku-4-5-20251001" for lowest cost (skips Five Forces / Financials)
 const MAX_CHARS = 150000;
 
 // JSON Schema for the structured output. The model fills this exactly, so the result is always valid JSON.

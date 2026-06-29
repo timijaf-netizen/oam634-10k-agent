@@ -11,13 +11,16 @@ const MAX_CHARS = 150000;
 
 const S = { type: "string" };
 const N = { type: "number" };
+const SD = (d) => ({ type: "string", description: d });
 const obj = (props, required) => ({ type: "object", properties: props, required: required || Object.keys(props) });
 const list = (items, min, max) => { const a = { type: "array", items }; if (min != null) a.minItems = min; if (max != null) a.maxItems = max; return a; };
 const PE = obj({ point: S, evidence: S });
 
 // Part A: the strategy story (statement + 5-column map + summary).
 const SCHEMA_A = obj({
-  company: S, fiscalYear: S, summary: S, valueProposition: S, pricePosition: S,
+  company: S, fiscalYear: S,
+  summary: SD("Two sentences: what is this firm's strategy and the core competitive logic. Never empty."),
+  valueProposition: S, pricePosition: S,
   strategyStatement: obj({
     objectives: list(PE, 1),
     where: obj({ customers: S, geography: S, products: S, notServing: S }),
@@ -31,7 +34,7 @@ const SCHEMA_A = obj({
     objective: obj({ name: S, detail: S }),
     links: list(obj({ from: S, to: S, why: S }), 6),
   }),
-  strategicImplications: S,
+  strategicImplications: SD("Required and never empty. Two sentences of your own synthesis: which strengths most sustain the activity system, which threat most attacks the value proposition, and the single most important strategic question this firm faces."),
 });
 
 // Part B: the assessment (value stick, SWOT, five forces, financial scorecard).

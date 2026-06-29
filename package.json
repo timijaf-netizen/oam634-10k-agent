@@ -1,0 +1,7 @@
+{
+  "name": "oam634-10k-strategy-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OAM-634 10-K Strategy Agent — upload a company's 10-K, get a course-framework strategic analysis. Powered by the Anthropic Claude API.",
+  "engines": { "node": ">=18" }
+}

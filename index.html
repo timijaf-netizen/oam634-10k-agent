@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OAM-634 · 10-K Strategy Agent</title>
+<style>
+  :root{
+    --emory-blue:#012169;
+    --emory-blue-2:#0a3a8c;
+    --gold:#b5a36a;
+    --ink:#15233b;
+    --muted:#5b6b86;
+    --bg:#f4f6fb;
+    --card:#ffffff;
+    --line:#e2e8f3;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;
+  }
+  header{
+    background:linear-gradient(135deg,var(--emory-blue),var(--emory-blue-2));
+    color:#fff;padding:28px 20px;border-bottom:4px solid var(--gold);
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
+  header h1{margin:0;font-size:22px;letter-spacing:.2px}
+  header p{margin:6px 0 0;opacity:.9;font-size:14px}
+  main{max-width:980px;margin:24px auto;padding:0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 1px 3px rgba(16,33,64,.06)}
+  .lead{color:var(--muted);font-size:14.5px;margin:0 0 18px}
+  .drop{
+    border:2px dashed #c6d2ea;border-radius:12px;padding:30px 20px;text-align:center;
+    background:#fbfcff;transition:.15s;cursor:pointer;
+  }
+  .drop.drag{border-color:var(--emory-blue);background:#eef3ff}
+  .drop strong{color:var(--emory-blue)}
+  .drop small{display:block;color:var(--muted);margin-top:6px}
+  #file{display:none}
+  .fname{margin-top:12px;font-size:14px;color:var(--ink);font-weight:600}
+  .row{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  button{
+    background:var(--emory-blue);color:#fff;border:0;border-radius:10px;
+    padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s;
+  }
+  button:hover:not(:disabled){background:var(--emory-blue-2)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:#fff;color:var(--emory-blue);border:1px solid #c6d2ea}
+  .status{font-size:13.5px;color:var(--muted)}
+  .bar{height:8px;background:#e8eefb;border-radius:99px;overflow:hidden;margin-top:14px;display:none}
+  .bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+  .out-wrap{margin-top:22px;display:none}
+  .out-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .out-head h2{font-size:15px;margin:0;color:var(--emory-blue)}
+  pre#out{
+    background:#0e1626;color:#e8edf6;border-radius:12px;padding:18px;
+    overflow:auto;max-height:70vh;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:12.5px;line-height:1.5;white-space:pre;tab-size:2;
+  }
+  .err{background:#fff4f4;border:1px solid #f3c9c9;color:#9a2222;border-radius:10px;padding:12px 14px;margin-top:14px;font-size:14px;display:none}
+  footer{max-width:980px;margin:10px auto 40px;padding:0 20px;color:var(--muted);font-size:12.5px}
+  a{color:var(--emory-blue)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>10-K Strategy Agent</h1>
+    <p>OAM-634 Strategic Management · Emory Goizueta — upload a company's 10-K, get a structured strategic analysis</p>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <p class="lead">Upload a 10-K PDF. The agent answers <strong>“What is the firm's strategy?”</strong> using the course frameworks — strategy statement (What / Where / How), strategy map with causal links, value stick, and SWOT — with every claim cited to the 10-K. No setup required.</p>
+
+    <label class="drop" id="drop" for="file">
+      <strong>Click to choose a 10-K PDF</strong> or drag &amp; drop it here
+      <small>Text-based PDFs only (not scanned images). Large filings are fine.</small>
+      <div class="fname" id="fname"></div>
+    </label>
+    <input type="file" id="file" accept="application/pdf,.pdf" />
+
+    <div class="row">
+      <button id="go" disabled>Analyze 10-K</button>
+      <span class="status" id="status">No file selected.</span>
+    </div>
+    <div class="bar" id="bar"><i id="barfill"></i></div>
+
+    <div class="err" id="err"></div>
+
+    <div class="out-wrap" id="outwrap">
+      <div class="out-head">
+        <h2>Strategic Analysis</h2>
+        <button class="ghost" id="dl">Download .txt</button>
+      </div>
+      <pre id="out"></pre>
+    </div>
+  </div>
+</main>
+
+<footer class="wrap">
+  Grounded only in the uploaded 10-K. Powered by Claude (Anthropic). Built for OAM-634, Emory Goizueta Business School.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  const $ = (id) => document.getElementById(id);
+  const fileInput = $("file"), drop = $("drop"), fname = $("fname");
+  const go = $("go"), statusEl = $("status"), bar = $("bar"), barfill = $("barfill");
+  const err = $("err"), outwrap = $("outwrap"), out = $("out"), dl = $("dl");
+  let chosen = null, companyName = "10-K";
+
+  function setErr(msg){ err.style.display = msg ? "block" : "none"; err.textContent = msg || ""; }
+  function pick(f){
+    setErr("");
+    if(!f) return;
+    if(f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){
+      setErr("Please choose a PDF file."); return;
+    }
+    chosen = f; companyName = f.name.replace(/\.pdf$/i,"").slice(0,60) || "10-K";
+    fname.textContent = "Selected: " + f.name;
+    go.disabled = false; statusEl.textContent = "Ready to analyze.";
+  }
+
+  fileInput.addEventListener("change", (e)=> pick(e.target.files[0]));
+  ["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.add("drag");}));
+  ["dragleave","drop"].forEach(ev=> drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove("drag");}));
+  drop.addEventListener("drop",(e)=>{ if(e.dataTransfer.files.length) pick(e.dataTransfer.files[0]); });
+
+  async function extractText(file){
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const n = pdf.numPages;
+    let text = "";
+    bar.style.display = "block";
+    for(let i=1;i<=n;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it=>it.str).join(" ") + "\n";
+      barfill.style.width = Math.round((i/n)*40) + "%"; // reading = first 40%
+      statusEl.textContent = `Reading PDF… page ${i} of ${n}`;
+    }
+    return text;
+  }
+
+  async function analyze(){
+    if(!chosen) return;
+    setErr(""); go.disabled = true; outwrap.style.display = "none"; out.textContent = "";
+    try{
+      const text = await extractText(chosen);
+      if(text.trim().length < 200){
+        bar.style.display="none";
+        setErr("Couldn't read enough text from this PDF. It may be a scanned image — try a text-based 10-K (e.g., the SEC EDGAR version).");
+        go.disabled = false; return;
+      }
+      statusEl.textContent = "Analyzing with the strategy frameworks…";
+      barfill.style.width = "55%";
+
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      if(!resp.ok || !resp.body){
+        const t = await resp.text().catch(()=> "");
+        bar.style.display="none";
+        setErr("Analysis failed: " + (t || ("HTTP " + resp.status)));
+        go.disabled = false; return;
+      }
+
+      outwrap.style.display = "block";
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      while(true){
+        const { done, value } = await reader.read();
+        if(done) break;
+        out.textContent += dec.decode(value, { stream: true });
+        out.scrollTop = out.scrollHeight;
+        barfill.style.width = "85%";
+      }
+      barfill.style.width = "100%";
+      statusEl.textContent = "Done.";
+      setTimeout(()=> bar.style.display="none", 600);
+    }catch(e){
+      bar.style.display="none";
+      setErr("Something went wrong: " + (e && e.message ? e.message : e));
+    }finally{
+      go.disabled = false;
+    }
+  }
+
+  go.addEventListener("click", analyze);
+  dl.addEventListener("click", ()=>{
+    const blob = new Blob([out.textContent], { type:"text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = companyName + " — Strategy Analysis.txt";
+    a.click();
+  });
+</script>
+</body>
+</html>
